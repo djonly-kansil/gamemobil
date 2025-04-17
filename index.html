@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bola Pantul Sentuh</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #111;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<script>
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+  let balls = [];
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+
+  window.addEventListener("resize", resize);
+  resize();
+
+  canvas.addEventListener("touchstart", (e) => {
+    for (const touch of e.touches) {
+      balls.push({
+        x: touch.clientX,
+        y: touch.clientY,
+        radius: 15,
+        vy: -15, // kecepatan awal pantulan ke atas
+        gravity: 0.8,
+        damping: 0.7 // pengurangan kecepatan tiap pantulan
+      });
+    }
+  });
+
+  function update() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (let ball of balls) {
+      ball.y += ball.vy;
+      ball.vy += ball.gravity;
+
+      if (ball.y + ball.radius >= canvas.height) {
+        ball.y = canvas.height - ball.radius;
+        ball.vy *= -ball.damping;
+
+        // jika sudah sangat kecil pantulannya, diamkan
+        if (Math.abs(ball.vy) < 1) {
+          ball.vy = 0;
+        }
+      }
+
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+      ctx.fillStyle = "cyan";
+      ctx.fill();
+    }
+
+    requestAnimationFrame(update);
+  }
+
+  update();
+</script>
+</body>
+</html>
