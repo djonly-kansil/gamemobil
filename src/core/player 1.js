@@ -5,7 +5,7 @@ export class Player {
     this.height = 80;
     this.x = canvas.width / 2 - this.width / 2;
     this.y = canvas.height - this.height - 20;
-    this.speed = 5;
+    this.speed = 6;
     this.color = this.getRandomColor();
   }
   update(touchSide) {

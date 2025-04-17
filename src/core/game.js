@@ -1,7 +1,7 @@
-import { GameUpdater } from './gameUpdater.js';
+import { GameUpdater } from '../updater/gameUpdater.js';
 import { GameRenderer } from './gameRenderer.js';
-import { GameEntities } from './gameEntities.js';
-import { GamePowerUps } from './gamePowerUps.js';
+import { GameEntities } from '../entities/gameEntities.js';
+import { GamePowerUps } from '../powerup/gamePowerUps.js';
 import { GameUI } from './gameUI.js';
 import { GameIndicatorBars } from './gameIndicatorBars.js'; // Tambah impor
 import { Player } from './player.js';

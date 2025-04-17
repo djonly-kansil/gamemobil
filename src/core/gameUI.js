@@ -39,7 +39,7 @@ export class GameUI {
         x: game.canvas.width / 2, // Posisi X (tengah layar)
         y: game.canvas.height / 2, // Posisi Y (tengah layar)
         fontSize: '36px',
-        fontFamily: 'Arial',
+        fontFamily: 'Digital-7',
       },
     };
   }
@@ -56,9 +56,9 @@ export class GameUI {
       this.levelUpMessageFrame = 0;
       if (this.level % 10 === 0) {
         this.game.bossMode = true;
-        this.game.speedMultiplier = 1 + (this.level - 1) * 0.2;
+        this.game.speedMultiplier = 1 + (this.level - 1) * 0.11;
       } else {
-        this.game.speedMultiplier = 1 + this.level * 0.2;
+        this.game.speedMultiplier = 1 + this.level * 0.1;
       }
     }
 
