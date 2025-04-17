@@ -1,198 +1,30 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bola Pantul Interaktif</title>
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      background: #fff;
-    }
-    canvas {
-      display: block;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Touch Ball Gravity with Particle Burst</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+        }
+        canvas {
+            border: 1px solid black;
+        }
+    </style>
 </head>
 <body>
-<canvas id="canvas"></canvas>
-
-<script>
-  const canvas = document.getElementById("canvas");
-  const ctx = canvas.getContext("2d");
-
-  const MAX_BALLS = 100;
-  const DROP_LIMIT = 50;
-  const BALL_RADIUS = 15;
-
-  let balls = [];
-  let triggerMassDrop = false;
-
-  function resize() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-  }
-  window.addEventListener("resize", resize);
-  resize();
-
-  class Ball {
-    constructor(x, y, isMassDrop = false) {
-      this.x = x;
-      this.y = y;
-      this.vx = (Math.random() - 0.5) * 6;
-      this.vy = -15;
-      this.radius = BALL_RADIUS;
-      this.color = `hsla(${Math.random() * 360}, 100%, 60%, 0.8)`;
-      this.gravity = 0.8;
-      this.damping = 0.7;
-      this.scaleY = 1;
-      this.scaleX = 1;
-      this.age = 0;
-      this.settle = false;
-      this.remove = false;
-      this.massDrop = isMassDrop;
-      this.bounceCount = 0;
-      this.maxBounces = 13;
-    }
-
-    update(delta, others) {
-      this.age += delta;
-
-      if (this.massDrop) {
-        this.vy += this.gravity;
-        this.y += this.vy;
-        if (this.y - this.radius > canvas.height) {
-          this.remove = true;
-        }
-        return;
-      }
-
-      if (this.settle) return;
-
-      this.vy += this.gravity;
-      this.x += this.vx;
-      this.y += this.vy;
-
-      // Pantulan dasar
-      if (this.y + this.radius >= canvas.height) {
-        this.y = canvas.height - this.radius;
-
-        if (Math.abs(this.vy) > 1 && this.bounceCount < this.maxBounces) {
-          this.vy *= -this.damping;
-          this.bounceCount++;
-          this.scaleY = 0.6;
-          this.scaleX = 1.3;
-
-          const sound = new Audio("assets/bounce.mp3");
-          sound.volume = 0.6;
-          sound.play().catch(() => {});
-        } else {
-          this.vx = 0;
-          this.vy = 0;
-          this.settle = true;
-        }
-      }
-
-      // Tembok kiri-kanan
-      if (this.x - this.radius < 0 || this.x + this.radius > canvas.width) {
-        this.vx *= -1;
-        this.x = Math.max(this.radius, Math.min(canvas.width - this.radius, this.x));
-      }
-
-      // Bounce antar bola
-      for (let other of others) {
-        if (other === this || other.massDrop || this.massDrop) continue;
-
-        const dx = other.x - this.x;
-        const dy = other.y - this.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const minDist = this.radius * 2;
-
-        if (dist < minDist && dist > 0) {
-          const overlap = minDist - dist;
-          const nx = dx / dist;
-          const ny = dy / dist;
-          const half = overlap / 2;
-
-          this.x -= nx * half;
-          this.y -= ny * half;
-          other.x += nx * half;
-          other.y += ny * half;
-
-          // Saling dorong sedikit
-          const vxTotal = this.vx - other.vx;
-          const vyTotal = this.vy - other.vy;
-
-          this.vx -= vxTotal * 0.05;
-          this.vy -= vyTotal * 0.05;
-          other.vx += vxTotal * 0.05;
-          other.vy += vyTotal * 0.05;
-        }
-      }
-
-      this.scaleY += (1 - this.scaleY) * 0.2;
-      this.scaleX += (1 - this.scaleX) * 0.2;
-    }
-
-    draw(ctx) {
-      const scale = Math.min(1, this.age / 0.2);
-      ctx.save();
-      ctx.translate(this.x, this.y);
-      ctx.scale(this.scaleX * scale, this.scaleY * scale);
-      ctx.beginPath();
-      ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-      ctx.fillStyle = this.color;
-      ctx.fill();
-      ctx.restore();
-    }
-  }
-
-  function addBall(x, y) {
-    if (balls.length < MAX_BALLS) {
-      balls.push(new Ball(x, y));
-      if (balls.length === DROP_LIMIT) {
-        triggerMassDrop = true;
-      }
-    }
-  }
-
-  canvas.addEventListener("mousedown", e => addBall(e.clientX, e.clientY));
-  canvas.addEventListener("touchstart", e => {
-    e.preventDefault();
-    for (let touch of e.touches) {
-      addBall(touch.clientX, touch.clientY);
-    }
-  }, { passive: false });
-
-  let lastTime = 0;
-  function loop(time) {
-    const delta = (time - lastTime) / 1000;
-    lastTime = time;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (triggerMassDrop) {
-      for (let ball of balls) {
-        ball.massDrop = true;
-        ball.vx = 0;
-        ball.vy = 5 + Math.random() * 5;
-      }
-      triggerMassDrop = false;
-    }
-
-    for (let i = 0; i < balls.length; i++) {
-      balls[i].update(delta, balls);
-    }
-
-    balls = balls.filter(b => !b.remove);
-    balls.forEach(b => b.draw(ctx));
-
-    requestAnimationFrame(loop);
-  }
-
-  requestAnimationFrame(loop);
-</script>
+    <canvas id="canvas"></canvas>
+    <script src="js/ball.js"></script>
+    <script src="js/particle.js"></script>
+    <script src="js/collision.js"></script>
+    <script src="js/blackBall.js"></script>
+    <script src="js/main.js"></script>
 </body>
 </html>
