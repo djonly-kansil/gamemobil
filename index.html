@@ -1,28 +1,66 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bola Pantul Sentuh</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Bola Pantul Interaktif</title>
   <style>
-    body, html {
+    html, body {
       margin: 0;
       padding: 0;
       overflow: hidden;
-      background: #111;
+      font-family: sans-serif;
     }
     canvas {
       display: block;
+      background: var(--bg);
+    }
+    #ui {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 10;
+      color: var(--text);
+      font-size: 14px;
+      background: rgba(0,0,0,0.3);
+      padding: 10px;
+      border-radius: 10px;
+    }
+    #ui button {
+      margin-top: 5px;
+    }
+
+    :root {
+      --bg: #111;
+      --text: #fff;
+    }
+    .light {
+      --bg: #f0f0f0;
+      --text: #000;
     }
   </style>
 </head>
 <body>
+<div id="ui">
+  <div id="stats">Bola: 0 | Pantulan: 0</div>
+  <button onclick="balls = []; particles = []; bounceCount = 0;">Reset</button><br>
+  <button onclick="toggleTheme()">Toggle Terang/Gelap</button><br>
+  <button onclick="toggleGravity()">Gravitasi: <span id="gravity-label">Normal</span></button>
+</div>
 <canvas id="canvas"></canvas>
+<audio id="bounceSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_7f378e08f2.mp3?filename=short-wet-impact-100259.mp3" preload="auto"></audio>
 
 <script>
   const canvas = document.getElementById("canvas");
   const ctx = canvas.getContext("2d");
+  const bounceSound = document.getElementById("bounceSound");
   let balls = [];
+  let particles = [];
+  let bounceCount = 0;
+  let lowGravity = false;
+
+  const GRAVITY = { normal: 0.8, low: 0.2 };
+  const DAMPING = 0.7;
 
   function resize() {
     canvas.width = window.innerWidth;
@@ -32,45 +70,186 @@
   window.addEventListener("resize", resize);
   resize();
 
-  canvas.addEventListener("touchstart", (e) => {
-    for (const touch of e.touches) {
-      balls.push({
-        x: touch.clientX,
-        y: touch.clientY,
-        radius: 15,
-        vy: -15, // kecepatan awal pantulan ke atas
-        gravity: 0.8,
-        damping: 0.7 // pengurangan kecepatan tiap pantulan
-      });
+  function randomColor() {
+    return `hsla(${Math.random()*360}, 100%, 60%, 0.8)`;
+  }
+
+  class Ball {
+    constructor(x, y) {
+      this.x = x;
+      this.y = y;
+      this.vx = (Math.random() - 0.5) * 6;
+      this.vy = -15;
+      this.radius = 15;
+      this.color = randomColor();
+      this.gravity = GRAVITY.normal;
+      this.damping = DAMPING;
+      this.scaleY = 1;
+      this.scaleX = 1;
+      this.age = 0;
+      this.bounced = false;
     }
-  });
 
-  function update() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    for (let ball of balls) {
-      ball.y += ball.vy;
-      ball.vy += ball.gravity;
+    update(delta) {
+      this.age += delta;
 
-      if (ball.y + ball.radius >= canvas.height) {
-        ball.y = canvas.height - ball.radius;
-        ball.vy *= -ball.damping;
+      this.x += this.vx;
+      this.y += this.vy;
+      this.vy += this.gravity;
 
-        // jika sudah sangat kecil pantulannya, diamkan
-        if (Math.abs(ball.vy) < 1) {
-          ball.vy = 0;
+      // Bounce ground
+      if (this.y + this.radius >= canvas.height) {
+        this.y = canvas.height - this.radius;
+        if (Math.abs(this.vy) > 1) {
+          this.vy *= -this.damping;
+          this.bounced = true;
+          this.scaleY = 0.6;
+          this.scaleX = 1.3;
+          bounceCount++;
+          playBounceSound();
+          spawnParticles(this.x, this.y);
+        } else {
+          this.vy = 0;
         }
       }
 
-      ctx.beginPath();
-      ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-      ctx.fillStyle = "cyan";
-      ctx.fill();
+      // Squash stretch recovery
+      this.scaleY += (1 - this.scaleY) * 0.2;
+      this.scaleX += (1 - this.scaleX) * 0.2;
+
+      // Bounce off sides
+      if (this.x - this.radius < 0 || this.x + this.radius > canvas.width) {
+        this.vx *= -1;
+      }
     }
 
-    requestAnimationFrame(update);
+    draw(ctx) {
+      let scale = Math.min(1, this.age / 0.2); // animasi masuk
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.scale(this.scaleX * scale, this.scaleY * scale);
+      ctx.beginPath();
+      ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+      ctx.fillStyle = this.color;
+      ctx.fill();
+      ctx.restore();
+    }
   }
 
-  update();
+  class Particle {
+    constructor(x, y, color) {
+      this.x = x;
+      this.y = y;
+      this.vx = (Math.random() - 0.5) * 4;
+      this.vy = Math.random() * -2;
+      this.life = 1;
+      this.color = color;
+    }
+
+    update(delta) {
+      this.x += this.vx;
+      this.y += this.vy;
+      this.life -= delta;
+    }
+
+    draw(ctx) {
+      ctx.globalAlpha = Math.max(this.life, 0);
+      ctx.fillStyle = this.color;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function spawnParticles(x, y) {
+    for (let i = 0; i < 10; i++) {
+      particles.push(new Particle(x, y, "#fff"));
+    }
+  }
+
+  function playBounceSound() {
+    bounceSound.currentTime = 0;
+    bounceSound.play().catch(() => {});
+  }
+
+  function handleInput(x, y) {
+    const ball = new Ball(x, y);
+    ball.gravity = lowGravity ? GRAVITY.low : GRAVITY.normal;
+    balls.push(ball);
+  }
+
+  canvas.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    for (const touch of e.touches) {
+      handleInput(touch.clientX, touch.clientY);
+    }
+  }, { passive: false });
+
+  canvas.addEventListener("mousedown", (e) => {
+    handleInput(e.clientX, e.clientY);
+  });
+
+  function toggleTheme() {
+    document.body.classList.toggle("light");
+  }
+
+  function toggleGravity() {
+    lowGravity = !lowGravity;
+    document.getElementById("gravity-label").textContent = lowGravity ? "Rendah" : "Normal";
+  }
+
+  function updateStats() {
+    document.getElementById("stats").textContent = `Bola: ${balls.length} | Pantulan: ${bounceCount}`;
+  }
+
+  function updatePhysics(delta) {
+    // Tabrakan sederhana antar bola
+    for (let i = 0; i < balls.length; i++) {
+      for (let j = i + 1; j < balls.length; j++) {
+        const a = balls[i];
+        const b = balls[j];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const minDist = a.radius + b.radius;
+        if (dist < minDist) {
+          const angle = Math.atan2(dy, dx);
+          const overlap = minDist - dist;
+          a.x -= Math.cos(angle) * overlap / 2;
+          a.y -= Math.sin(angle) * overlap / 2;
+          b.x += Math.cos(angle) * overlap / 2;
+          b.y += Math.sin(angle) * overlap / 2;
+        }
+      }
+    }
+  }
+
+  let lastTime = 0;
+  function loop(time) {
+    const delta = (time - lastTime) / 1000;
+    lastTime = time;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    updatePhysics(delta);
+
+    for (let ball of balls) {
+      ball.update(delta);
+      ball.draw(ctx);
+    }
+
+    particles = particles.filter(p => p.life > 0);
+    for (let p of particles) {
+      p.update(delta);
+      p.draw(ctx);
+    }
+
+    updateStats();
+    requestAnimationFrame(loop);
+  }
+
+  requestAnimationFrame(loop);
 </script>
 </body>
 </html>
